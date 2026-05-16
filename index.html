@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scipeer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:#fff;color:#0d0d0d;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;background:#fff;border-bottom:1px solid #ebebeb}
+.nav-logo{font-weight:700;font-size:16px;letter-spacing:-0.03em;color:#0d0d0d;text-decoration:none;display:flex;align-items:center;gap:10px}
+.nav-logo b{color:#4f46e5}
+.nav-sep{font-size:11px;font-weight:400;color:#ccc}
+.nav-fuzue svg{height:14px;width:auto;display:block}
+.nav-apply{font-size:13px;font-weight:600;padding:7px 16px;background:#0d0d0d;color:#fff;border-radius:6px;text-decoration:none;transition:background .15s}
+.nav-apply:hover{background:#333}
+
+/* hero, centered full-width */
+.hero{min-height:100vh;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:80px 12vw 60px;border-bottom:none;padding-top:52px;background:linear-gradient(to bottom,#ffffff 0%,#ffffff 65%,#c8cef5 100%)}
+#hero-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.hero-fade{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 60%,rgba(180,188,240,.6) 100%);pointer-events:none}
+.hero-content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center}
+.hero-eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;color:#999;letter-spacing:.12em;text-transform:uppercase;margin-bottom:28px}
+.hero h1{font-size:clamp(38px,5vw,68px);font-weight:700;letter-spacing:-0.04em;line-height:1.08;color:#0d0d0d;max-width:860px;margin-bottom:28px}
+.hero h1 i{font-style:normal;color:#4f46e5}
+.hero-sub{font-size:18px;color:#555;line-height:1.7;max-width:600px;margin-bottom:56px}
+.hero-scroll{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;font-size:12px;color:rgba(30,27,75,.6);font-family:'JetBrains Mono',monospace;letter-spacing:.08em;white-space:nowrap;z-index:1}
+.hero-scroll svg path{stroke:rgba(30,27,75,.5)}
+.hero-scroll svg{animation:bounce 2s ease-in-out infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(7px)}}
+
+/* scrollytelling, both panels sticky */
+.scrolly{display:grid;grid-template-columns:1fr 1fr}
+.graph-panel{position:sticky;top:52px;height:calc(100vh - 52px);background:#07091a;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:28px 28px 28px 32px;gap:14px;align-self:start;overflow:hidden}
+.graph-svg{width:100%;max-width:560px;height:auto;opacity:0;transform:translateX(-14px);transition:opacity .7s ease,transform .7s ease;overflow:visible}
+.graph-panel.active .graph-svg{opacity:1;transform:translateX(0)}
+.step-counter{font-family:'JetBrains Mono',monospace;font-size:13px;color:rgba(160,210,255,.85);letter-spacing:.08em;align-self:flex-start;text-shadow:0 0 8px rgba(100,180,255,.7),0 0 20px rgba(80,140,255,.4)}
+
+/* text panel, sticky inside text-outer */
+.text-outer{position:relative}
+.text-panel{position:sticky;top:52px;height:calc(100vh - 52px);display:flex;align-items:center;padding:60px 72px;align-self:start}
+.text-content{max-width:480px;transition:opacity .2s ease}
+.text-content.fading{opacity:0}
+.tc-counter{font-family:'JetBrains Mono',monospace;font-size:11px;color:#bbb;letter-spacing:.1em;margin-bottom:20px}
+.tc-title{font-size:clamp(28px,3.2vw,44px);font-weight:700;letter-spacing:-0.04em;line-height:1.1;color:#0d0d0d;margin-bottom:22px}
+.tc-body{font-size:17px;color:#555;line-height:1.75}
+.tc-body em{font-style:normal;color:#4f46e5;font-weight:600}
+.tc-body p+p{margin-top:14px}
+/* scroll triggers, invisible, create height */
+.scroll-triggers{pointer-events:none}
+.trigger{height:100vh}
+
+/* graph node animation */
+.node-inner{transform-box:fill-box;transform-origin:center;transition:transform .45s cubic-bezier(.34,1.56,.64,1),opacity .4s ease}
+.ng.hidden .node-inner{opacity:0;transform:scale(.05)}
+.ng.visible .node-inner{opacity:1;transform:scale(1)}
+.ng.focused .node-inner{opacity:1;transform:scale(1.22)}
+/* node rect border brightens when focused */
+.ng.focused .nb{filter:brightness(1.4)}
+@keyframes popIn{
+  0%  {opacity:0;transform:scale(.05)}
+  55% {opacity:1;transform:scale(1.45)}
+  100%{opacity:1;transform:scale(1)}
+}
+.ng.just-appeared .node-inner{animation:popIn .65s cubic-bezier(.34,1.56,.64,1) forwards}
+
+/* edges */
+.eg{fill:none;stroke-dasharray:1200;stroke-dashoffset:1200;opacity:0;transition:stroke-dashoffset .7s ease .05s,opacity .3s ease}
+.eg.visible{stroke-dashoffset:0;opacity:1}
+.eg.hidden{stroke-dashoffset:1200;opacity:0}
+.eg-prop{fill:none;stroke-dasharray:7 5;opacity:0;transition:opacity .5s ease}
+.eg-prop.visible{opacity:1}
+
+/* node text */
+.nt{font:500 9px/1 'Inter',sans-serif;fill:rgba(255,255,255,.45);text-anchor:middle}
+.nn{font:700 11.5px/1 'Inter',sans-serif;fill:rgba(255,255,255,.92);text-anchor:middle}
+.ns{font:400 9.5px/1 'Inter',sans-serif;fill:rgba(255,255,255,.55);text-anchor:middle}
+
+/* details */
+.details{padding:96px 10vw;border-top:1px solid #ebebeb}
+.details h2{font-size:clamp(26px,3vw,40px);font-weight:700;letter-spacing:-0.035em;line-height:1.15;color:#0d0d0d;margin-bottom:14px}
+.details>p{font-size:16px;color:#666;max-width:600px;line-height:1.7;margin-bottom:56px}
+.details-grid{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #ebebeb;border-radius:8px;overflow:hidden}
+.db{padding:36px;border-right:1px solid #ebebeb;border-bottom:1px solid #ebebeb}
+.db:nth-child(2n){border-right:none}.db:nth-last-child(-n+2){border-bottom:none}
+.db h3{font-size:14px;font-weight:700;color:#0d0d0d;margin-bottom:10px}
+.db p{font-size:14px;color:#666;line-height:1.65}
+.db ul{list-style:none;display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.db li{font-size:13px;color:#555;display:flex;gap:8px}
+.db li::before{content:'→';color:#4f46e5;flex-shrink:0;font-size:12px;margin-top:1px}
+.mcp-tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.mt{font-family:'JetBrains Mono',monospace;font-size:11.5px;padding:5px 12px;border:1px solid #e5e7eb;border-radius:100px;color:#555;background:#fafafa}
+
+/* form */
+.form-section{padding:96px 10vw;background:#07091a;border-top:1px solid rgba(255,255,255,.05)}
+.form-section h2{font-size:clamp(24px,2.5vw,36px);font-weight:700;letter-spacing:-0.035em;color:#fff;margin-bottom:12px}
+.form-section>p{font-size:15px;color:rgba(255,255,255,.45);margin-bottom:48px;max-width:520px;line-height:1.65}
+.form-inner{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start}
+.form-crit{list-style:none;display:flex;flex-direction:column;gap:12px;padding-top:8px}
+.form-crit li{font-size:14px;color:rgba(255,255,255,.55);display:flex;align-items:flex-start;gap:10px;line-height:1.5}
+.form-crit li::before{content:'→';color:#818cf8;flex-shrink:0}
+.fg{display:grid;gap:14px}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:6px}
+input,select,textarea{width:100%;padding:10px 13px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
+input::placeholder,textarea::placeholder{color:rgba(255,255,255,.2)}
+select option{background:#1a1a2e}
+input:focus,select:focus,textarea:focus{border-color:rgba(129,140,248,.7)}
+textarea{resize:vertical;min-height:90px;line-height:1.5}
+.btn-submit{width:100%;padding:12px;background:#4f46e5;color:#fff;font-size:14px;font-weight:600;border:none;border-radius:7px;cursor:pointer;margin-top:4px;transition:background .15s}
+.btn-submit:hover{background:#4338ca}
+
+/* provenance, git-timeline */
+.provenance{background:#f4f5fb;padding:96px 10vw}
+.prov-inner{max-width:700px;margin:0 auto}
+.prov-eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;color:#999;letter-spacing:.12em;text-transform:uppercase;margin-bottom:18px;text-align:center}
+.provenance h2{font-size:clamp(26px,3vw,40px);font-weight:700;letter-spacing:-0.04em;line-height:1.15;color:#0d0d0d;margin-bottom:12px;text-align:center}
+.prov-sub{font-size:15px;color:#666;line-height:1.7;margin-bottom:16px;text-align:center}
+.prov-legend{display:flex;gap:20px;justify-content:center;margin-bottom:52px}
+.pt-leg{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#555}
+.pt-leg-h{width:9px;height:9px;border-radius:2px;background:#4f46e5;flex-shrink:0}
+.pt-leg-a{width:9px;height:9px;border-radius:50%;background:#10b981;flex-shrink:0}
+
+/* timeline */
+.prov-timeline{position:relative;padding-left:48px}
+/* vertical line centered at x=12 */
+.prov-timeline::before{content:'';position:absolute;left:11px;top:14px;bottom:14px;width:2px;background:#dddff0;border-radius:2px}
+
+/* each entry */
+.pt{position:relative;padding:0 0 22px 0}
+.pt:last-child{padding-bottom:0}
+
+/* card */
+.pt-card{position:relative;margin-left:36px;background:#fff;border:1px solid #e8eaf2;border-radius:8px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.pt.key .pt-card{border-color:#c4c0f0;background:#fafaff;box-shadow:0 2px 8px rgba(79,70,229,.08)}
+
+/* horizontal arm: from vertical line (x=12) to card left (x=84) */
+.pt-card::before{content:'';position:absolute;left:-72px;top:17px;width:72px;height:2px;background:#dddff0}
+
+.pt-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.pt-actor{font-size:12px;font-weight:700;letter-spacing:.01em;display:flex;align-items:center;gap:5px}
+.pt.human .pt-actor{color:#4f46e5}
+.pt.agent .pt-actor{color:#059669}
+/* inline indicator before actor name */
+.pt.human .pt-actor::before{content:'';display:inline-block;width:9px;height:9px;border-radius:2px;background:#4f46e5;flex-shrink:0}
+.pt.agent .pt-actor::before{content:'';display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;flex-shrink:0}
+.pt.pending .pt-actor{color:#999}
+.pt.pending .pt-actor::before{content:'';display:inline-block;width:9px;height:9px;border-radius:50%;background:transparent;border:2px solid #c0c4d8;flex-shrink:0}
+.pt-time{font-family:'JetBrains Mono',monospace;font-size:11px;color:#bbb;margin-left:auto}
+
+.pt-action{font-size:14px;color:#2d2d2d;line-height:1.45}
+.pt-ent{font-weight:700;color:#0d0d0d}
+.pt-note{font-size:12px;color:#888;font-style:italic;margin-top:5px;line-height:1.4}
+
+@media(max-width:900px){
+  .provenance{padding:64px 6vw}
+  .prov-inner{max-width:100%}
+  .prov-timeline{padding-left:28px}
+  .pt-card{padding:12px 14px}
+  /* mobile: padding-left 28px → card at x=64, line center at x=12, arm=52px */
+  .pt-card::before{left:-52px;width:52px}
+}
+
+footer{padding:48px 10vw 36px;background:#07091a;border-top:1px solid rgba(255,255,255,.05)}
+.footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:24px}
+.footer-brand{display:flex;flex-direction:column;gap:10px}
+.footer-fuzue-logo svg{height:28px;width:auto;display:block}
+.footer-product{font-size:12px;color:rgba(255,255,255,.3);letter-spacing:.02em}
+.footer-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.footer-contact{font-size:13px;color:rgba(255,255,255,.4);text-decoration:none;transition:color .15s}
+.footer-contact:hover{color:rgba(255,255,255,.75)}
+.footer-copy{font-size:11px;color:rgba(255,255,255,.2)}
+
+@media(max-width:900px){
+  .scrolly{grid-template-columns:1fr}
+
+  /* graph: sticky at top, sized by height so all nodes fit */
+  .graph-panel{
+    position:sticky;
+    top:52px;
+    height:50vh;
+    display:flex;
+    justify-content:center;
+    padding:10px 12px 6px;
+    align-self:start;
+    overflow:visible;
+    z-index:1;
+  }
+  /* fit by height, not width, so bottom nodes aren't clipped */
+  .graph-svg{
+    height:100%;
+    width:auto;
+    max-width:100%;
+  }
+  .step-counter{font-size:9px}
+
+  /* text: sticky just below graph, solid background */
+  .text-panel{
+    position:sticky;
+    top:calc(52px + 50vh);
+    height:calc(50vh - 52px);
+    padding:18px 24px;
+    align-self:start;
+    background:#fff;
+    border-top:1px solid #e5e5e5;
+    z-index:2;
+    overflow-y:auto;
+  }
+  .tc-counter{font-size:10px;margin-bottom:8px}
+  .tc-title{font-size:22px;margin-bottom:10px}
+  .tc-body{font-size:14px}
+
+  .details-grid{grid-template-columns:1fr}
+  .db:nth-child(2n){border-right:none}
+  .form-inner{grid-template-columns:1fr}
+  .fr{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="nav-logo">
+    <span>Sci<b>peer</b></span>
+    <span class="nav-sep">by</span>
+    <span class="nav-fuzue"><svg viewBox="454 250 582 266" xmlns="http://www.w3.org/2000/svg"><path fill="#231F20" d="M853.3,255.7h51.5v197c0,11.3-1.8,20.4-5.3,27.4c-3.5,7.3-9.2,13.9-17.3,19.9c-10.9,7.9-24.1,11.8-39.6,11.8c-17.6,0-32.4-4.4-44.3-13.1c-15.1-11.1-22.7-28.9-22.7-53.3v-36.3L827,286.3v154.6c0,8.3,1,14.2,3,17.6s5.4,5.2,10.2,5.2c4.9,0,8.3-1.6,10.2-4.8c1.9-3.4,2.8-9.3,2.8-17.9V255.7z"/><polygon fill="#231F20" points="1030.8,255.8 1018.3,308 975.6,308 975.6,328.6 1002.1,328.6 1002.1,380.8 975.6,380.8 975.6,455.9 1030.8,455.9 1030.8,508 923.4,508.1 923.4,255.8"/><path fill="#231F20" d="M728.7,455.9l80.9-200.1l-350.5,0.1v254h51.7V434h20.5v-52.2h-20.5V308l209.3-0.1L638.5,508c0,0,85.8,0,133.8,0c-23.3-11.4-23.7-52.2-23.7-52.2H728.7z"/><path fill="#231F20" d="M679,329.9h-49.3V441c0,8.6-0.9,14.5-2.8,17.9c-1.9,3.2-5.3,4.8-10.2,4.8c-4.8,0-8.2-1.7-10.2-5.2c-2-3.5-3-9.3-3-17.6v-111h-51.5v115.5c0,24.4,7.6,42.2,22.7,53.3c8.9,6.5,19.3,10.5,31.3,12.2L679,329.9z"/></svg></span>
+  </a>
+  <a href="#apply" class="nav-apply">Apply for beta</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-fade"></div>
+  <div class="hero-content">
+    <div class="hero-eyebrow">Private beta · Research AI</div>
+    <h1>The AI forgets everything<br>between sessions.<br><i>Your research shouldn't.</i></h1>
+    <p class="hero-sub">Scipeer builds a persistent knowledge graph from your work. Every new AI session starts knowing what you've done, what you've tried, and why.</p>
+  </div>
+  <div class="hero-scroll">
+    <svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v14M2 9l6 8 6-8" stroke="#bbb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    SCROLL TO SEE HOW IT WORKS
+  </div>
+</section>
+
+<!-- SCROLLYTELLING -->
+<section class="scrolly" id="scrolly">
+
+  <!-- LEFT: sticky graph -->
+  <div class="graph-panel" id="graph-panel">
+    <div class="step-counter" id="step-counter">01 / 09</div>
+    <svg class="graph-svg" viewBox="0 0 660 670" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r=".9" fill="rgba(255,255,255,.035)"/>
+        </pattern>
+        <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="6" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="glow-sm" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="660" height="670" fill="url(#dots)"/>
+
+      <!-- EDGES (behind nodes) -->
+      <!-- event 0 -->
+      <path id="eg-per-proj"  class="eg hidden" d="M116 148 C190 148 270 88 302 80"   stroke="rgba(100,116,139,.5)" stroke-width="1.5"/>
+      <path id="eg-ins-proj"  class="eg hidden" d="M115 272 C195 240 268 132 306 90"  stroke="rgba(139,92,246,.4)"  stroke-width="1.5"/>
+      <path id="eg-tec-proj"  class="eg hidden" d="M538 132 C490 132 424 88 378 80"  stroke="rgba(100,116,139,.45)" stroke-width="1.5"/>
+      <!-- event 1 -->
+      <path id="eg-proj-exp"  class="eg hidden" d="M340 92 C340 120 340 168 340 196" stroke="rgba(99,102,241,.6)"  stroke-width="1.5"/>
+      <path id="eg-ins-exp"   class="eg hidden" d="M120 282 C192 270 270 222 308 218" stroke="rgba(139,92,246,.5)" stroke-width="1.5"/>
+      <!-- event 2 -->
+      <path id="eg-exp-dat"   class="eg hidden" d="M368 228 C410 228 472 282 508 290" stroke="rgba(6,182,212,.5)"  stroke-width="1.5"/>
+      <path id="eg-ins-dat"   class="eg hidden" d="M126 292 C260 270 390 302 505 302" stroke="rgba(6,182,212,.35)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <!-- event 3 -->
+      <path id="eg-dat-nb"    class="eg hidden" d="M510 316 C470 316 416 358 368 368" stroke="rgba(245,158,11,.5)" stroke-width="1.5"/>
+      <path id="eg-exp-nb"    class="eg hidden" d="M340 248 C340 290 340 334 340 348" stroke="rgba(99,102,241,.4)" stroke-width="1.5"/>
+      <!-- event 4 -->
+      <path id="eg-nb-pub"    class="eg hidden" d="M316 374 C254 374 194 432 132 446" stroke="rgba(16,185,129,.5)" stroke-width="1.5"/>
+      <!-- event 5 -->
+      <path id="eg-nb-geo"    class="eg hidden" d="M364 372 C410 370 464 424 508 434" stroke="rgba(16,185,129,.5)" stroke-width="1.5"/>
+      <!-- event 6 -->
+      <path id="eg-exp-h1"    class="eg hidden" d="M325 238 C250 320 180 430 130 513" stroke="rgba(34,197,94,.5)"  stroke-width="1.5"/>
+      <path id="eg-nb-h1"     class="eg hidden" d="M318 382 C260 420 200 470 130 513" stroke="rgba(34,197,94,.45)" stroke-width="1.5"/>
+      <!-- event 7 -->
+      <path id="eg-nb-h2"     class="eg hidden" d="M340 390 L330 520"                stroke="rgba(107,114,128,.4)" stroke-width="1.5"/>
+      <path id="eg-nb-h3"     class="eg hidden" d="M362 382 C430 420 490 470 520 513" stroke="rgba(107,114,128,.4)" stroke-width="1.5"/>
+      <!-- event 8: proposed dashed -->
+      <path id="eg-h1-expb"   class="eg-prop hidden" d="M130 571 C160 600 195 618 220 628" stroke="rgba(129,140,248,.65)" stroke-width="1.5"/>
+      <path id="eg-ins-expb"  class="eg-prop hidden" d="M100 300 C100 400 120 520 175 610" stroke="rgba(129,140,248,.5)"  stroke-width="1.5"/>
+      <path id="eg-dat-code"  class="eg-prop hidden" d="M538 318 C520 400 490 510 445 610" stroke="rgba(245,158,11,.5)"   stroke-width="1.5"/>
+      <path id="eg-nb-code"   class="eg-prop hidden" d="M362 388 C410 460 438 550 440 610" stroke="rgba(245,158,11,.45)"  stroke-width="1.5"/>
+
+      <!-- NODES (rect-based) -->
+
+      <!-- PROJECT (340,68) 160×54 -->
+      <g id="ng-project" class="ng hidden" transform="translate(340,68)">
+        <g class="node-inner">
+          <rect class="nb" x="-80" y="-27" width="160" height="54" rx="9" fill="#1a2d5a" stroke="#3b82f6" stroke-width="2"/>
+          <text class="nt" y="-13">Project</text>
+          <text class="nn" y="1">IL-2 / Treg Study</text>
+          <text class="ns" y="15">#7 · active</text>
+        </g>
+      </g>
+
+      <!-- PERSON (100,162) 144×48 -->
+      <g id="ng-person" class="ng hidden" transform="translate(100,162)">
+        <g class="node-inner">
+          <rect class="nb" x="-72" y="-24" width="144" height="48" rx="8" fill="#1e2538" stroke="#64748b" stroke-width="1.5"/>
+          <text class="nt" y="-12">Person</text>
+          <text class="nn" y="2">Dr. Zhang</text>
+          <text class="ns" y="14">PI · Lead researcher</text>
+        </g>
+      </g>
+
+      <!-- INSTRUMENT (100,290) 152×52 -->
+      <g id="ng-instrument" class="ng hidden" transform="translate(100,290)">
+        <g class="node-inner">
+          <rect class="nb" x="-76" y="-26" width="152" height="52" rx="8" fill="#221550" stroke="#8b5cf6" stroke-width="1.5"/>
+          <text class="nt" y="-14">Instrument</text>
+          <text class="nn" y="0">LSRFortessa</text>
+          <text class="ns" y="13">BD Biosciences</text>
+        </g>
+      </g>
+
+      <!-- TOOLS (530,142) 152×52 -->
+      <g id="ng-tools" class="ng hidden" transform="translate(530,142)">
+        <g class="node-inner">
+          <rect class="nb" x="-76" y="-26" width="152" height="52" rx="8" fill="#1e2538" stroke="#475569" stroke-width="1.5"/>
+          <text class="nt" y="-14">Tech Stack</text>
+          <text class="nn" y="0">Python · R</text>
+          <text class="ns" y="13">FlowCal · ggplot2 · Seurat</text>
+        </g>
+      </g>
+
+      <!-- EXPERIMENT (340,224) 164×54 -->
+      <g id="ng-experiment" class="ng hidden" transform="translate(340,224)">
+        <g class="node-inner">
+          <rect class="nb" x="-82" y="-27" width="164" height="54" rx="9" fill="#1e1e6e" stroke="#6366f1" stroke-width="2"/>
+          <text class="nt" y="-14">Experiment</text>
+          <text class="nn" y="0">Flow Cytometry #7</text>
+          <text class="ns" y="14">24-plex panel · Tregs</text>
+        </g>
+      </g>
+
+      <!-- DATA (532,304) 152×52 -->
+      <g id="ng-data" class="ng hidden" transform="translate(532,304)">
+        <g class="node-inner">
+          <rect class="nb" x="-76" y="-26" width="152" height="52" rx="8" fill="#0a2535" stroke="#06b6d4" stroke-width="1.5"/>
+          <text class="nt" y="-14">Data · FCS v3</text>
+          <text class="nn" y="0">847 MB</text>
+          <text class="ns" y="13">versioned · linked to run</text>
+        </g>
+      </g>
+
+      <!-- NOTEBOOK (340,374) 156×52 -->
+      <g id="ng-notebook" class="ng hidden" transform="translate(340,374)">
+        <g class="node-inner">
+          <rect class="nb" x="-78" y="-26" width="156" height="52" rx="8" fill="#2a2008" stroke="#f59e0b" stroke-width="1.5"/>
+          <text class="nt" y="-14">Notebook</text>
+          <text class="nn" y="0">analysis.ipynb</text>
+          <text class="ns" y="13">FlowCal · scikit-learn · pandas</text>
+        </g>
+      </g>
+
+      <!-- PUBMED (108,452) 148×50 -->
+      <g id="ng-pubmed" class="ng hidden" transform="translate(108,452)">
+        <g class="node-inner">
+          <rect class="nb" x="-74" y="-25" width="148" height="50" rx="8" fill="#0a2518" stroke="#10b981" stroke-width="1.5"/>
+          <text class="nt" y="-13">PubMed · 3 papers</text>
+          <text class="nn" y="1">IL-2 + Treg</text>
+          <text class="ns" y="13">dose-response studies</text>
+        </g>
+      </g>
+
+      <!-- GEO (526,440) 148×50 -->
+      <g id="ng-geo" class="ng hidden" transform="translate(526,440)">
+        <g class="node-inner">
+          <rect class="nb" x="-74" y="-25" width="148" height="50" rx="8" fill="#0a2518" stroke="#10b981" stroke-width="1.5"/>
+          <text class="nt" y="-13">GEO Dataset</text>
+          <text class="nn" y="1">GSE206999</text>
+          <text class="ns" y="13">IL-2 treatment conditions</text>
+        </g>
+      </g>
+
+      <!-- H1 active (130,542) 180×58 glow -->
+      <g id="ng-h1" class="ng hidden" transform="translate(130,542)" filter="url(#glow)">
+        <g class="node-inner">
+          <rect class="nb" x="-90" y="-29" width="180" height="58" rx="10" fill="#0c2d1c" stroke="#22c55e" stroke-width="2.5"/>
+          <text class="nt" y="-16" fill="rgba(34,197,94,.75)">● active hypothesis</text>
+          <text class="nn" y="-2" fill="rgba(255,255,255,.95)">Hypothesis 1: Biphasic</text>
+          <text class="ns" y="12" fill="rgba(34,197,94,.8)">IL-2 dose-response in Tregs</text>
+        </g>
+      </g>
+
+      <!-- H2 pending (330,542) 148×44 -->
+      <g id="ng-h2" class="ng hidden" transform="translate(330,542)">
+        <g class="node-inner">
+          <rect class="nb" x="-74" y="-22" width="148" height="44" rx="7" fill="#181b28" stroke="#4b5563" stroke-width="1.5"/>
+          <text class="nt" y="-10" fill="rgba(255,255,255,.3)">◌ pending</text>
+          <text class="nn" y="5" fill="rgba(255,255,255,.4)">Hypothesis 2</text>
+        </g>
+      </g>
+
+      <!-- H3 pending (520,542) 148×44 -->
+      <g id="ng-h3" class="ng hidden" transform="translate(520,542)">
+        <g class="node-inner">
+          <rect class="nb" x="-74" y="-22" width="148" height="44" rx="7" fill="#181b28" stroke="#4b5563" stroke-width="1.5"/>
+          <text class="nt" y="-10" fill="rgba(255,255,255,.3)">◌ pending</text>
+          <text class="nn" y="5" fill="rgba(255,255,255,.4)">Hypothesis 3</text>
+        </g>
+      </g>
+
+      <!-- EXPB proposed (220,634) 144×48 dashed -->
+      <g id="ng-expb" class="ng hidden" transform="translate(220,634)">
+        <g class="node-inner">
+          <rect class="nb" x="-72" y="-24" width="144" height="48" rx="8" fill="#161830" stroke="#818cf8" stroke-width="1.5" stroke-dasharray="6 4"/>
+          <text class="nt" y="-12" fill="rgba(129,140,248,.6)">Proposed Experiment</text>
+          <text class="nn" y="3" fill="rgba(129,140,248,.9)">Titration run</text>
+          <text class="ns" y="15" fill="rgba(129,140,248,.5)">LSRFortessa · cytokine panel</text>
+        </g>
+      </g>
+
+      <!-- CODE proposed (440,634) 144×48 dashed -->
+      <g id="ng-code" class="ng hidden" transform="translate(440,634)">
+        <g class="node-inner">
+          <rect class="nb" x="-72" y="-24" width="144" height="48" rx="8" fill="#251c0a" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="6 4"/>
+          <text class="nt" y="-12" fill="rgba(251,191,36,.6)">Proposed Code</text>
+          <text class="nn" y="3" fill="rgba(251,191,36,.9)">analysis_v2.py</text>
+          <text class="ns" y="15" fill="rgba(251,191,36,.5)">Draft · Python · pandas</text>
+        </g>
+      </g>
+
+    </svg>
+  </div>
+
+  <!-- RIGHT: sticky text + invisible scroll triggers -->
+  <div class="text-outer">
+    <div class="text-panel">
+      <div class="text-content" id="text-content">
+        <div class="tc-counter" id="tc-counter">01 / 09</div>
+        <h2 class="tc-title" id="tc-title">The project starts.</h2>
+        <div class="tc-body" id="tc-body">
+          <p>Dr. Zhang connects the instruments, the team, the tools, context that's usually scattered across emails and memory.</p>
+          <p><em>Every node is typed. Every node has provenance: who added it, when, why.</em></p>
+        </div>
+      </div>
+    </div>
+    <div class="scroll-triggers" id="scroll-triggers">
+      <div class="trigger" data-event="0"></div>
+      <div class="trigger" data-event="1"></div>
+      <div class="trigger" data-event="2"></div>
+      <div class="trigger" data-event="3"></div>
+      <div class="trigger" data-event="4"></div>
+      <div class="trigger" data-event="5"></div>
+      <div class="trigger" data-event="6"></div>
+      <div class="trigger" data-event="7"></div>
+      <div class="trigger" data-event="8"></div>
+    </div>
+  </div>
+
+</section>
+
+<!-- PROVENANCE -->
+<section class="provenance">
+  <div class="prov-inner">
+    <div class="prov-eyebrow">Provenance &amp; versioning</div>
+    <h2>Every decision, traced.</h2>
+    <p class="prov-sub">Human intuition and AI reasoning, side by side. Every action leaves a permanent record, who did it, when, and why.</p>
+    <div class="prov-legend">
+      <span class="pt-leg"><span class="pt-leg-h"></span>Researcher</span>
+      <span class="pt-leg"><span class="pt-leg-a"></span>Scipeer agent</span>
+    </div>
+
+    <div class="prov-timeline">
+
+      <div class="pt human">
+        <div class="pt-card">
+          <div class="pt-head"><span class="pt-actor">Dr. Zhang</span><span class="pt-time">09:14</span></div>
+          <div class="pt-action">created project <strong class="pt-ent">IL-2 / Treg Study</strong></div>
+          <div class="pt-note">"Investigating biphasic IL-2 dose-response in Treg populations"</div>
+        </div>
+      </div>
+
+      <div class="pt human">
+        <div class="pt-card">
+          <div class="pt-head"><span class="pt-actor">Dr. Zhang</span><span class="pt-time">14:32</span></div>
+          <div class="pt-action">logged experiment <strong class="pt-ent">Flow Cytometry #7</strong>, 24-plex panel, 847 MB FCS</div>
+          <div class="pt-note">"LSRFortessa run, gated on CD4+ Treg populations"</div>
+        </div>
+      </div>
+
+      <div class="pt agent">
+        <div class="pt-card">
+          <div class="pt-head"><span class="pt-actor">Scipeer</span><span class="pt-time">14:44</span></div>
+          <div class="pt-action">fetched and linked <strong class="pt-ent">3 PubMed papers</strong>, IL-2 + Treg + dose-response</div>
+          <div class="pt-note">auto-linked to Experiment #7 · every claim cited to exact source passage</div>
+        </div>
+      </div>
+
+      <div class="pt human key">
+        <div class="pt-card">
+          <div class="pt-head"><span class="pt-actor">Dr. Zhang</span><span class="pt-time">14:51</span></div>
+          <div class="pt-action">proposed <strong class="pt-ent">Hypothesis 1</strong>, IL-2 dose-response is biphasic in Tregs</div>
+          <div class="pt-note">"I've seen this pattern in the pilot data, needs a formal titration test"</div>
+        </div>
+      </div>
+
+      <div class="pt agent">
+        <div class="pt-card">
+          <div class="pt-head"><span class="pt-actor">Scipeer</span><span class="pt-time">14:52</span></div>
+          <div class="pt-action">linked <strong class="pt-ent">supporting evidence</strong> to Hypothesis 1</div>
+          <div class="pt-note">GSE206999 · Sadlack et al. 2013 · Fontenot et al. 2005, cited to exact passages</div>
+        </div>
+      </div>
+
+      <div class="pt agent">
+        <div class="pt-card">
+          <div class="pt-head"><span class="pt-actor">Scipeer</span><span class="pt-time">15:03</span></div>
+          <div class="pt-action">proposed <strong class="pt-ent">Hypothesis 2</strong>, inferred from clustering residuals in analysis.ipynb</div>
+          <div class="pt-note">unexplained variance in CD25-high subpopulation · confidence: moderate</div>
+        </div>
+      </div>
+
+      <div class="pt human">
+        <div class="pt-card">
+          <div class="pt-head"><span class="pt-actor">Dr. Zhang</span><span class="pt-time">15:06</span></div>
+          <div class="pt-action">approved <strong class="pt-ent">Hypothesis 2</strong></div>
+          <div class="pt-note">"Worth tracking, revisit after next run"</div>
+        </div>
+      </div>
+
+      <div class="pt agent">
+        <div class="pt-card">
+          <div class="pt-head"><span class="pt-actor">Scipeer</span><span class="pt-time">15:08</span></div>
+          <div class="pt-action">proposed experiment <strong class="pt-ent">Titration run</strong>, 6 IL-2 concentrations, LSRFortessa</div>
+          <div class="pt-note">to resolve biphasic window in Hypothesis 1 · awaiting PI approval before anything runs</div>
+        </div>
+      </div>
+
+      <div class="pt human pending">
+        <div class="pt-card">
+          <div class="pt-head"><span class="pt-actor">Dr. Zhang</span><span class="pt-time"></span></div>
+          <div class="pt-action"><strong class="pt-ent">Pending review</strong>, titration run awaiting approval</div>
+          <div class="pt-note">nothing executes until you say so</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- DETAILS -->
+<section class="details">
+  <h2>Under the graph.</h2>
+  <p>Scipeer is a reasoning layer, not another tool. It connects to where your work already lives and makes every AI session start fully informed.</p>
+  <div class="details-grid">
+    <div class="db">
+      <h3>Graph store</h3>
+      <p>PostgreSQL + pgvector. Every entity, relationship, and provenance record is queryable. Semantic search over embeddings, exact query over structure.</p>
+      <ul>
+        <li>Typed nodes with full provenance (actor, timestamp, reason)</li>
+        <li>Versioned entities, data files, notebooks, hypotheses</li>
+        <li>Semantic similarity search at query time</li>
+      </ul>
+    </div>
+    <div class="db">
+      <h3>MCP tools for Claude</h3>
+      <p>Scipeer exposes 9 MCP tools. When you open Claude Code in your project directory, it already has the full graph in context.</p>
+      <div class="mcp-tools">
+        <span class="mt">get_context</span>
+        <span class="mt">add_experiment</span>
+        <span class="mt">add_hypothesis</span>
+        <span class="mt">link_literature</span>
+        <span class="mt">search_graph</span>
+        <span class="mt">propose_action</span>
+        <span class="mt">get_timeline</span>
+        <span class="mt">export_report</span>
+        <span class="mt">get_provenance</span>
+      </div>
+    </div>
+    <div class="db">
+      <h3>Connectors</h3>
+      <p>Scipeer ingests from wherever your research lives. Domain-agnostic, works for wet labs, AI research, physics, computational biology.</p>
+      <ul>
+        <li>Any LIMS, openBIS, SampleDB, Chemotion, Benchling, Labguru</li>
+        <li>Jupyter notebooks with executed outputs</li>
+        <li>Semantic Scholar + PubMed literature pipeline</li>
+        <li>Raw instrument files, FCS, HDF5, CSV</li>
+        <li>REST APIs and generic CSV connectors</li>
+      </ul>
+    </div>
+    <div class="db">
+      <h3>Staged autonomy</h3>
+      <p>The agent reasons and proposes, it cannot act. Every action that touches the physical world produces a proposal node. A human approves or rejects. That decision is recorded.</p>
+      <ul>
+        <li>Proposal → Review → Approve/Reject → Execute</li>
+        <li>Approval recorded as a typed edge with timestamp</li>
+        <li>No silent writes to external systems in v1</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- BETA FORM -->
+<section class="form-section" id="apply">
+  <h2>Apply for early access.</h2>
+  <p>We're onboarding a small cohort to shape the product. If you've hit the "AI forgets everything" problem and want to help fix it, we want to hear from you.</p>
+  <div class="form-inner">
+    <ul class="form-crit">
+      <li>Any research domain, wet lab, AI, physics, CS, computational biology</li>
+      <li>Uses Claude Code or another AI assistant regularly</li>
+      <li>Has a real "lost context" frustration you want solved</li>
+      <li>Willing to give feedback during early access</li>
+    </ul>
+    <div class="fg">
+      <div class="fr">
+        <div><label>Name</label><input type="text" id="f-name" placeholder="Your name"></div>
+        <div><label>Email</label><input type="email" id="f-email" placeholder="you@institution.edu"></div>
+      </div>
+      <div><label>Institution</label><input type="text" id="f-inst" placeholder="University or company"></div>
+      <div>
+        <label>Role</label>
+        <select id="f-role">
+          <option value="">Select…</option>
+          <option>PhD Student</option><option>Postdoc</option>
+          <option>Principal Investigator</option><option>Research Scientist</option>
+          <option>Research Engineer</option><option>Lab Manager</option><option>Other</option>
+        </select>
+      </div>
+      <div><label>What context are you losing?</label><textarea id="f-pain" placeholder="Describe the problem…"></textarea></div>
+      <button class="btn-submit" onclick="submitForm()">Send application →</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="footer-fuzue-logo">
+        <svg viewBox="454 250 582 266" xmlns="http://www.w3.org/2000/svg">
+          <path fill="rgba(255,255,255,0.6)" d="M853.3,255.7h51.5v197c0,11.3-1.8,20.4-5.3,27.4c-3.5,7.3-9.2,13.9-17.3,19.9c-10.9,7.9-24.1,11.8-39.6,11.8
+            c-17.6,0-32.4-4.4-44.3-13.1c-15.1-11.1-22.7-28.9-22.7-53.3v-36.3L827,286.3v154.6c0,8.3,1,14.2,3,17.6s5.4,5.2,10.2,5.2
+            c4.9,0,8.3-1.6,10.2-4.8c1.9-3.4,2.8-9.3,2.8-17.9V255.7z"/>
+          <polygon fill="rgba(255,255,255,0.6)" points="1030.8,255.8 1018.3,308 975.6,308 975.6,328.6 1002.1,328.6 1002.1,380.8 975.6,380.8 975.6,455.9 1030.8,455.9 1030.8,508 923.4,508.1 923.4,255.8"/>
+          <path fill="rgba(255,255,255,0.6)" d="M728.7,455.9l80.9-200.1l-350.5,0.1v254h51.7V434h20.5v-52.2h-20.5V308l209.3-0.1L638.5,508c0,0,85.8,0,133.8,0
+            c-23.3-11.4-23.7-52.2-23.7-52.2H728.7z"/>
+          <path fill="rgba(255,255,255,0.6)" d="M679,329.9h-49.3V441c0,8.6-0.9,14.5-2.8,17.9c-1.9,3.2-5.3,4.8-10.2,4.8c-4.8,0-8.2-1.7-10.2-5.2
+            c-2-3.5-3-9.3-3-17.6v-111h-51.5v115.5c0,24.4,7.6,42.2,22.7,53.3c8.9,6.5,19.3,10.5,31.3,12.2L679,329.9z"/>
+        </svg>
+      </div>
+      <div class="footer-product">Scipeer · a Fuzue product · Private beta 2026</div>
+    </div>
+    <div class="footer-right">
+      <a href="mailto:contact@fuzue.tech" class="footer-contact">contact@fuzue.tech</a>
+      <span class="footer-copy">© 2026 Fuzue. All rights reserved.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ── Hero background graph ──
+(function(){
+  const canvas = document.getElementById('hero-canvas');
+  const ctx = canvas.getContext('2d');
+  const N = 60, LINK_DIST = 200, NODE_R = 3.5;
+  let W, H, nodes;
+
+  function resize(){
+    W = canvas.width  = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+
+  function init(){
+    resize();
+    nodes = Array.from({length:N}, () => ({
+      x: Math.random()*W, y: Math.random()*H,
+      vx: (Math.random()-.5)*.28, vy: (Math.random()-.5)*.28,
+      r: NODE_R + Math.random()*2.5
+    }));
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    // edges
+    for(let i=0;i<N;i++){
+      for(let j=i+1;j<N;j++){
+        const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if(d<LINK_DIST){
+          const alpha=(1-d/LINK_DIST)*0.22;
+          ctx.beginPath();
+          ctx.moveTo(nodes[i].x,nodes[i].y);
+          ctx.lineTo(nodes[j].x,nodes[j].y);
+          ctx.strokeStyle=`rgba(79,70,229,${alpha})`;
+          ctx.lineWidth=1;
+          ctx.stroke();
+        }
+      }
+    }
+
+    // nodes
+    nodes.forEach(n=>{
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+      ctx.fillStyle='rgba(79,70,229,0.28)';
+      ctx.fill();
+    });
+  }
+
+  function tick(){
+    nodes.forEach(n=>{
+      n.x+=n.vx; n.y+=n.vy;
+      if(n.x<-20) n.x=W+20;
+      else if(n.x>W+20) n.x=-20;
+      if(n.y<-20) n.y=H+20;
+      else if(n.y>H+20) n.y=-20;
+    });
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  window.addEventListener('resize', ()=>{ resize(); });
+  init();
+  tick();
+})();
+
+// ── Event data ──
+const EVENTS = [
+  {
+    label:'01 / 09 / 2026',
+    title:'The project starts.',
+    body:`<p>Dr. Zhang connects the instruments, the team, the tools, context that's usually scattered across emails and memory.</p><p><em>Every node is typed. Every node has provenance: who added it, when, why.</em></p>`,
+    nodes:['ng-project','ng-person','ng-instrument','ng-tools'],
+    edges:['eg-per-proj','eg-ins-proj','eg-tec-proj'],
+    props:[],
+    focusNodes:['ng-project']
+  },
+  {
+    label:'02 / 09 / 2026',
+    title:'Experiment logged.',
+    body:`<p><em>Flow Cytometry #7</em> is running. Linked to the LSRFortessa, the protocol, and Dr. Zhang, not just a filename in a folder.</p>`,
+    nodes:['ng-experiment'],
+    edges:['eg-proj-exp','eg-ins-exp'],
+    props:[],
+    focusNodes:['ng-experiment']
+  },
+  {
+    label:'03 / 09 / 2026',
+    title:'Data arrives, versioned.',
+    body:`<p>847 MB of FCS files. <em>Linked to the run and the LSRFortessa.</em></p><p>The dashed edge records provenance, it didn't just appear, it came from this instrument, this run.</p>`,
+    nodes:['ng-data'],
+    edges:['eg-exp-dat','eg-ins-dat'],
+    props:[],
+    focusNodes:['ng-data']
+  },
+  {
+    label:'04 / 09 / 2026',
+    title:'Analysis begins.',
+    body:`<p>The agent opens <em>analysis.ipynb</em>, already knowing this data format, this instrument, this team's usual stack.</p><p>FlowCal for gating. scikit-learn for clustering. No instructions needed.</p>`,
+    nodes:['ng-notebook'],
+    edges:['eg-dat-nb','eg-exp-nb'],
+    props:[],
+    focusNodes:['ng-notebook']
+  },
+  {
+    label:'05 / 09 / 2026',
+    title:'Literature pulled.',
+    body:`<p>It fetches <em>3 PubMed papers</em> matching IL-2 + Treg + dose-response.</p><p>Every claim will link back to a quote from the source text. No hallucinated citations.</p>`,
+    nodes:['ng-pubmed'],
+    edges:['eg-nb-pub'],
+    props:[],
+    focusNodes:['ng-pubmed']
+  },
+  {
+    label:'06 / 09 / 2026',
+    title:'Public data linked.',
+    body:`<p><em>GSE206999</em>, a public GEO dataset with similar IL-2 treatment conditions.</p><p>The agent cross-references. It doesn't guess.</p>`,
+    nodes:['ng-geo'],
+    edges:['eg-nb-geo'],
+    props:[],
+    focusNodes:['ng-geo']
+  },
+  {
+    label:'07 / 09 / 2026',
+    title:'A hypothesis forms.',
+    body:`<p><em>Hypothesis 1: IL-2 dose-response is biphasic in Treg populations.</em></p><p>Flagged active. Fully traceable to the data and the literature that generated it.</p>`,
+    nodes:['ng-h1'],
+    edges:['eg-exp-h1','eg-nb-h1'],
+    props:[],
+    focusNodes:['ng-h1']
+  },
+  {
+    label:'08 / 09 / 2026',
+    title:'Two more, pending.',
+    body:`<p>Hypothesis 2 and Hypothesis 3 stay in the graph, <em>not discarded, not forgotten.</em></p><p>They surface when new data arrives that could support or refute them.</p>`,
+    nodes:['ng-h2','ng-h3'],
+    edges:['eg-nb-h2','eg-nb-h3'],
+    props:[],
+    focusNodes:['ng-h2','ng-h3']
+  },
+  {
+    label:'09 / 09 / 2026',
+    title:'The agent proposes.\u00a0You decide.',
+    body:`<p>A titration run on the LSRFortessa. A draft analysis script. Both appear as <em>dashed nodes, proposed, not real.</em></p><p>Nothing runs until you approve. That decision gets recorded too.</p>`,
+    nodes:['ng-expb','ng-code'],
+    edges:[],
+    props:['eg-h1-expb','eg-ins-expb','eg-dat-code','eg-nb-code'],
+    focusNodes:['ng-expb','ng-code']
+  }
+];
+
+// All node/edge IDs and their event step
+const NODE_STEPS={};
+const EDGE_STEPS={};
+const PROP_STEPS={};
+EVENTS.forEach((ev,i)=>{
+  ev.nodes.forEach(id=>NODE_STEPS[id]=i);
+  ev.edges.forEach(id=>EDGE_STEPS[id]=i);
+  ev.props.forEach(id=>PROP_STEPS[id]=i);
+});
+
+let activeEvent=-1;
+const counterEl=document.getElementById('step-counter');
+const tcCounter=document.getElementById('tc-counter');
+const tcTitle=document.getElementById('tc-title');
+const tcBody=document.getElementById('tc-body');
+const tcContent=document.getElementById('text-content');
+
+function setNodeClass(id,cls){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.remove('hidden','visible','focused','just-appeared');
+  el.classList.add(cls);
+}
+
+function updateGraph(newEvent){
+  if(newEvent===activeEvent)return;
+  const oldEvent=activeEvent;
+  activeEvent=newEvent;
+  const ev=EVENTS[newEvent];
+  const focusSet=new Set(ev.focusNodes);
+
+  counterEl.textContent=ev.label;
+
+  // Nodes
+  for(const[id,step]of Object.entries(NODE_STEPS)){
+    const wasVis=step<=oldEvent;
+    const isVis=step<=newEvent;
+    if(!isVis){
+      setNodeClass(id,'hidden');
+    } else if(!wasVis){
+      // Newly appearing, pop animation, then settle into focused or visible
+      const el=document.getElementById(id);
+      if(!el)continue;
+      el.classList.remove('hidden','visible','focused');
+      el.classList.add('just-appeared');
+      const target=focusSet.has(id)?'focused':'visible';
+      setTimeout(()=>{el.classList.remove('just-appeared');el.classList.add(target)},660);
+    } else {
+      // Already visible, apply focus or normal
+      setNodeClass(id,focusSet.has(id)?'focused':'visible');
+    }
+  }
+
+  // Edges
+  for(const[id,step]of Object.entries(EDGE_STEPS)){
+    const el=document.getElementById(id);
+    if(!el)continue;
+    el.classList.toggle('visible',step<=newEvent);
+    el.classList.toggle('hidden',step>newEvent);
+  }
+  for(const[id,step]of Object.entries(PROP_STEPS)){
+    const el=document.getElementById(id);
+    if(!el)continue;
+    el.classList.toggle('visible',step<=newEvent);
+    el.classList.toggle('hidden',step>newEvent);
+  }
+
+  // Text
+  tcContent.classList.add('fading');
+  setTimeout(()=>{
+    tcCounter.textContent=ev.label;
+    tcTitle.textContent=ev.title;
+    tcBody.innerHTML=ev.body;
+    tcContent.classList.remove('fading');
+  },200);
+}
+
+// Init all hidden, then show event 0
+(function init(){
+  for(const id of Object.keys(NODE_STEPS)){
+    const el=document.getElementById(id);
+    if(el)el.classList.add('hidden');
+  }
+  for(const id of Object.keys(EDGE_STEPS)){
+    const el=document.getElementById(id);
+    if(el)el.classList.add('hidden')
+  }
+  for(const id of Object.keys(PROP_STEPS)){
+    const el=document.getElementById(id);
+    if(el)el.classList.add('hidden');
+  }
+  updateGraph(0);
+  // Slide in SVG after short delay (real browser: smooth; screenshots: instant)
+  setTimeout(()=>document.getElementById('graph-panel').classList.add('active'), 80);
+})();
+
+// Also add active when scrolly enters viewport (belt-and-suspenders)
+// Reveal graph SVG when scrolly enters viewport (slide-in effect)
+const graphPanel=document.getElementById('graph-panel');
+const scrollySection=document.getElementById('scrolly');
+// Fire immediately if already in viewport (e.g. direct link), else on scroll
+const revealObs=new IntersectionObserver(entries=>{
+  if(entries[0].isIntersecting){graphPanel.classList.add('active');revealObs.disconnect();}
+},{threshold:0.02,rootMargin:'0px 0px -10% 0px'});
+revealObs.observe(scrollySection);
+
+// IntersectionObserver for scroll events
+const triggerObs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const ev=parseInt(e.target.dataset.event);
+      updateGraph(ev);
+    }
+  });
+},{threshold:0.5});
+document.querySelectorAll('.trigger').forEach(t=>triggerObs.observe(t));
+
+// Form submit
+function submitForm(){
+  const name=document.getElementById('f-name').value.trim();
+  const email=document.getElementById('f-email').value.trim();
+  const inst=document.getElementById('f-inst').value.trim();
+  const role=document.getElementById('f-role').value;
+  const pain=document.getElementById('f-pain').value.trim();
+  const body=`Name: ${name}\nEmail: ${email}\nInstitution: ${inst}\nRole: ${role}\n\nProblem:\n${pain}`;
+  window.location.href=`mailto:e@vaz.io?subject=Scipeer Beta Application: ${encodeURIComponent(name)}&body=${encodeURIComponent(body)}`;
+}
+</script>
+</body>
+</html>
